@@ -35,26 +35,16 @@ struct MovieDetailView: View {
                     Button(role: .destructive) {
                         deleteMovie()
                     } label: {
-                        Label {
-                            Text("Elimina")
-                                .foregroundStyle(Color.red.opacity(0.9))
-                        } icon: {
-                            Image(systemName: "trash")
-                                .foregroundStyle(Color.red.opacity(0.9))
-                        }
+                        Label("Elimina", systemImage: "trash")
                     }
+                    .tint(Color.red.opacity(0.9))
                     
                     Button {
                         refreshMovie()
                     } label: {
-                        Label {
-                            Text("Aggiorna")
-                                .foregroundStyle(.white.opacity(0.9))
-                        } icon: {
-                            Image(systemName: "arrow.clockwise")
-                                .foregroundStyle(.white.opacity(0.9))
-                        }
+                        Label("Aggiorna", systemImage: "arrow.clockwise")
                     }
+                    .tint(Color.white.opacity(0.9))
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.title3)
