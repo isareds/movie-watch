@@ -1,196 +1,237 @@
 import SwiftUI
-import Observation
 import SwiftData
 
 struct HomeView: View {
     @Environment(\.modelContext) private var context
     
     @Query(sort: \Movie.createdAt, order: .reverse) private var movies: [Movie]
-    @State private var newTitle = ""
+    @State private var searchStore = SearchStore()
     @FocusState private var searchFieldFocused: Bool
     
-    @State private var isShowingSearch = false
-    @State private var isSearchBarVisible = true
-    @State private var lastScrollOffset: CGFloat = 0
-    @State private var hasCapturedScrollOffset = false
-    @State private var searchStore = SearchStore()
-
     var body: some View {
         NavigationStack {
             ZStack {
                 NoisyBackground()
-
-                VStack(spacing: 16) {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(Array(movies.enumerated()), id: \.element.id) { index, movie in
-                                let isLast = index == movies.count - 1
-                                NavigationLink(value: movie) {
-                                    MovieRowView(movie: movie, showSeparator: !isLast) {
-                                        movie.seen.toggle()
-                                        Haptics.light()
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                                .animation(.spring(response: 0.35, dampingFraction: 0.85), value: movies.count)
-                            }
-                            Spacer(minLength: 80)
-                        }
-                        .padding(.horizontal)
-                        .background(
-                            GeometryReader { proxy in
-                                Color.clear
-                                    .preference(key: ScrollOffsetPreferenceKey.self, value: proxy.frame(in: .named("homeScroll")).minY)
-                            }
-                        )
-                    }
-                    .coordinateSpace(name: "homeScroll")
-                    .onPreferenceChange(ScrollOffsetPreferenceKey.self, perform: handleScrollChange)
-                }
-
-                inputBar
-                    .padding(.horizontal)
-                    .padding(.bottom, 12)
-                    .offset(y: isSearchBarVisible ? 0 : 140)
-                    .opacity(isSearchBarVisible ? 1 : 0)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .ignoresSafeArea()
+                content
             }
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie)
             }
-            .navigationTitle("MovieGlass")
-            .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                searchPanel
+            }
         }
     }
+    
+    private var content: some View {
+        List {
+            moviesSection
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
+        .listRowSeparator(.hidden)
+        .contentMargins(.bottom, isSearchPanelVisible ? 240 : 120, for: .scrollContent)
+    }
+    
+    private var isSearchPanelVisible: Bool {
+        searchFieldFocused || shouldShowSearchResults
+    }
+    
+    private var shouldShowSearchResults: Bool {
+        let trimmed = trimmedSearchQuery
+        return !trimmed.isEmpty || searchStore.isLoading || !searchStore.results.isEmpty
+    }
+    
+    private var trimmedSearchQuery: String {
+        searchStore.query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private var moviesSection: some View {
+        Section {
+            if movies.isEmpty {
+                VStack(spacing: 14) {
+                    Image(systemName: "film")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                    Text("Aggiungi un film dalla ricerca per iniziare.")
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(Array(movies.enumerated()), id: \.element.id) { index, movie in
+                    let isLast = index == movies.count - 1
+                    NavigationLink(value: movie) {
+                        MovieRowView(movie: movie, showSeparator: !isLast) {
+                            movie.seen.toggle()
+                            Haptics.light()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+                    .listRowBackground(Color.clear)
+                }
+            }
+        }
+    }
+}
 
-    private var inputBar: some View {
-        let queryBinding = Binding(
-            get: { searchStore.query },
-            set: { searchStore.query = $0 }
-        )
-        
-        return VStack(spacing: 12) {
-            if isShowingSearch {
+// MARK: - Helpers
+private extension HomeView {
+    var searchPanel: some View {
+        VStack(spacing: 12) {
+            if shouldShowSearchResults {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Risultati TMDB")
                             .font(.headline)
+                            .foregroundStyle(.primary)
                         Spacer()
-                        Button {
-                            clearSearch(closeOverlay: true)
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.title3)
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(.secondary)
+                        if !trimmedSearchQuery.isEmpty || !searchStore.results.isEmpty {
+                            Button {
+                                clearSearch(closeOverlay: true)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title3)
+                                    .symbolRenderingMode(.hierarchical)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Chiudi ricerca")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Chiudi ricerca")
                     }
                     
-                    searchOverlayContent
+                    searchResultsContent
                 }
-                .padding(.vertical, 14)
-                .padding(.horizontal, 16)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.white.opacity(0.15), lineWidth: 0.8)
-                }
-                .shadow(radius: 12, y: 8)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             
-            searchTextField(queryBinding: queryBinding)
+            searchField
         }
-        .onChange(of: searchFieldFocused) { _, isFocused in
-            if isFocused {
-                showSearchBar()
+        .padding(.vertical, 16)
+        .padding(.horizontal, 18)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(Color.white.opacity(0.15), lineWidth: 0.8)
+        }
+        .shadow(radius: 12, y: 8)
+        .padding(.horizontal)
+        .padding(.bottom, 10)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: shouldShowSearchResults)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: searchFieldFocused)
+    }
+    
+    var searchResultsContent: some View {
+        Group {
+            if searchStore.isLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Ricerca in corso…")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else if searchStore.results.isEmpty {
+                Text(trimmedSearchQuery.isEmpty ? "Inizia a digitare per cercare su TMDB." : "Nessun risultato per \"\(trimmedSearchQuery)\".")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .minimumScaleFactor(0.85)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(searchStore.results) { item in
+                            Button {
+                                addMovie(from: item)
+                            } label: {
+                                searchResultRow(for: item)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .frame(maxHeight: 280)
             }
-            updateSearchOverlayVisibility()
-        }
-        .onChange(of: searchStore.query) { _, _ in
-            updateSearchOverlayVisibility()
-        }
-        .onChange(of: searchStore.isLoading) { _, _ in
-            updateSearchOverlayVisibility()
-        }
-        .onChange(of: searchStore.results.count) { _, _ in
-            updateSearchOverlayVisibility()
         }
     }
-
-    private func searchTextField(queryBinding: Binding<String>) -> some View {
-        ZStack(alignment: .trailing) {
-            TextField("Cerca su TMDB…", text: queryBinding)
-                .focused($searchFieldFocused)
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .disableAutocorrection(true)
-                .submitLabel(.search)
-                .onTapGesture {
-                    showSearchBar()
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        isShowingSearch = true
-                    }
-                }
-                .onSubmit {
-                    searchStore.searchImmediately()
-                }
-                .frame(maxWidth: .infinity)
+    
+    var searchField: some View {
+        HStack(spacing: 12) {
+            TextField("Cerca su TMDB…", text: Binding(
+                get: { searchStore.query },
+                set: { searchStore.query = $0 }
+            ))
+            .focused($searchFieldFocused)
+            .textInputAutocapitalization(.never)
+            .disableAutocorrection(true)
+            .submitLabel(.search)
+            .onSubmit {
+                searchStore.searchImmediately()
+            }
             
-            if !searchStore.query.isEmpty {
+            if !trimmedSearchQuery.isEmpty {
                 Button {
                     clearSearch(closeOverlay: false)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.footnote)
+                        .font(.callout)
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.secondary)
-                        .padding(.trailing, 12)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Cancella ricerca")
+                .transition(.opacity)
             }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.12))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 0.8)
+        }
     }
-
-    @ViewBuilder
-    private var searchOverlayContent: some View {
-        let trimmed = trimmedSearchQuery
-        if searchStore.isLoading {
-            HStack(spacing: 8) {
-                ProgressView()
-                Text("Ricerca in corso…")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        } else if searchStore.results.isEmpty {
-            Text(trimmed.isEmpty ? "Inizia a digitare per cercare su TMDB." : "Nessun risultato per \"\(trimmed)\".")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .minimumScaleFactor(0.8)
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(searchStore.results) { item in
-                        Button {
-                            selectSearchResult(item)
-                        } label: {
-                            searchResultRow(for: item)
-                        }
-                        .buttonStyle(.plain)
-                    }
+    
+    func clearSearch(closeOverlay: Bool) {
+        searchStore.query = ""
+        searchStore.results.removeAll()
+        if closeOverlay {
+            searchFieldFocused = false
+        }
+    }
+    
+    func addMovie(from item: TMDBSearchItem) {
+        let title = item.title ?? "Senza titolo"
+        let movie = Movie(title: title, isFetching: true)
+        context.insert(movie)
+        
+        Task {
+            do {
+                let api = try MovieAPI()
+                await api.enrich(movie: movie, in: context)
+                await MainActor.run {
+                    Haptics.success()
+                    searchFieldFocused = false
+                    searchStore.query = ""
+                    searchStore.results.removeAll()
                 }
-                .padding(.vertical, 4)
+            } catch {
+                print("Errore aggiunta:", error.localizedDescription)
+                await MainActor.run { movie.isFetching = false }
             }
-            .frame(maxHeight: 320)
         }
     }
-
+    
     @ViewBuilder
-    private func searchResultRow(for item: TMDBSearchItem) -> some View {
+    func searchResultRow(for item: TMDBSearchItem) -> some View {
         HStack(spacing: 12) {
             AsyncImage(url: URL(string: "https://image.tmdb.org/t/p/w154\(item.poster_path ?? "")")) { phase in
                 switch phase {
@@ -200,12 +241,15 @@ struct HomeView: View {
                 @unknown default: searchPosterPlaceholder
                 }
             }
-            .frame(width: 60, height: 90)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .frame(width: 50, height: 75)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .shadow(radius: 8, y: 6)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title ?? "Senza titolo")
                     .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
                 if let date = item.release_date, !date.isEmpty {
                     Text(String(date.prefix(4)))
                         .font(.subheadline)
@@ -217,137 +261,23 @@ struct HomeView: View {
             
             Image(systemName: "plus.circle.fill")
                 .font(.title3)
+                .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.mint)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(12)
         .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color.white.opacity(0.08))
         }
     }
-
-    private var searchPosterPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .fill(.ultraThinMaterial)
-            .overlay(Image(systemName: "film").opacity(0.3))
-    }
-
-    private var trimmedSearchQuery: String {
-        searchStore.query.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func selectSearchResult(_ item: TMDBSearchItem) {
-        let title = item.title ?? "Senza titolo"
-        let movie = Movie(title: title, isFetching: true)
-        context.insert(movie)
-        
-        Task {
-            do {
-                let api = try MovieAPI()
-                await api.enrich(movie: movie, in: context)
-                await MainActor.run {
-                    Haptics.success()
-                    searchStore.query = ""
-                    searchStore.results.removeAll()
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        isShowingSearch = false
-                    }
-                    searchFieldFocused = false
-                }
-            } catch {
-                print("Errore aggiunta:", error.localizedDescription)
-            }
-        }
-    }
-
-    private func addMovie() {
-        let clean = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !clean.isEmpty else { return }
-        
-        let m = Movie(title: clean, isFetching: true)
-        context.insert(m)
-        newTitle = ""
-        Haptics.success()
-        
-        Task {
-            do {
-                let api = try MovieAPI()
-                await api.enrich(movie: m, in: context)
-            } catch {
-                print("MovieAPI error: ", error.localizedDescription)
-                await MainActor.run { m.isFetching = false }
-            }
-        }
-    }
-}
-
-// MARK: - Scroll handling & helpers
-private extension HomeView {
-    func handleScrollChange(_ value: CGFloat) {
-        if !hasCapturedScrollOffset {
-            hasCapturedScrollOffset = true
-            lastScrollOffset = value
-            return
-        }
-        
-        let delta = value - lastScrollOffset
-        if abs(delta) > 12 {
-            if delta < 0 && value < -20 {
-                hideSearchBarIfNeeded()
-            } else if delta > 0 {
-                showSearchBar()
-            }
-        }
-        
-        if value >= -10 {
-            showSearchBar()
-        }
-        
-        lastScrollOffset = value
-    }
     
-    func hideSearchBarIfNeeded() {
-        guard isSearchBarVisible, !searchFieldFocused, !isShowingSearch else { return }
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            isSearchBarVisible = false
-        }
-    }
-    
-    func showSearchBar() {
-        guard !isSearchBarVisible else { return }
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            isSearchBarVisible = true
-        }
-    }
-    
-    func updateSearchOverlayVisibility() {
-        let shouldShow = searchFieldFocused
-            || !trimmedSearchQuery.isEmpty
-            || searchStore.isLoading
-            || !searchStore.results.isEmpty
-        
-        guard shouldShow != isShowingSearch else { return }
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            isShowingSearch = shouldShow
-        }
-    }
-    
-    func clearSearch(closeOverlay: Bool) {
-        searchStore.query = ""
-        searchStore.results.removeAll()
-        if closeOverlay {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                isShowingSearch = false
-            }
-            searchFieldFocused = false
-        }
-    }
-}
-
-private struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+    var searchPosterPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color.white.opacity(0.1))
+            .overlay(
+                Image(systemName: "film")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.35))
+            )
     }
 }
