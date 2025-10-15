@@ -1,0 +1,106 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon must end with two \r
+Icon
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Xcode
+DerivedData/
+build/
+Build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.xccheckout
+*.xcscmblueprint
+/*.xcworkspace/xcuserdata/
+xcuserdata/
+*.xccurrentversion
+*.moved-aside
+*.xcuserstate
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Code coverage
+*.xccoverage
+
+# Swift Package Manager
+Packages/
+Package.pins
+Package.resolved
+.build/
+.swiftpm/
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Carthage
+Carthage/Build/
+
+# Accio dependency manager
+Dependencies/Build/
+Dependencies/Checkouts/
+Dependencies/*.bin
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output/
+fastlane/readme.md
+
+# AppCode
+.idea/
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace/
+
+# SwiftPM Xcode project integration
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Project settings
+*.orproj
+
+# Objective-C/Swift specific
+*.swp
+*.lock
+profile
+*.mobileprovision
+*.provisionprofile
+
+# Generated documentation
+docs/api/
+
+# Secrets (keep real credentials out of VCS)
+MovieWatch/Secrets.plist
