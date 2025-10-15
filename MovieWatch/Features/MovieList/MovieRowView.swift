@@ -50,10 +50,6 @@ struct MovieRowView: View {
                 }
                 
                 Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.35))
             }
             
             if !providerCategories.isEmpty {
@@ -120,7 +116,18 @@ struct MovieRowView: View {
     @ViewBuilder
     private func providerCategoryBadge(for category: ProviderCategory) -> some View {
         HStack(spacing: 6) {
-            providerLogoStack(for: category.providers)
+            if category.kind == .flatrate {
+                providerLogoStack(for: category.providers)
+            } else if let symbol = category.symbolName {
+                Image(systemName: symbol)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(category.tint)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        Circle()
+                            .fill(category.tint.opacity(0.2))
+                    )
+            }
             Text(category.displayLabel)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(category.tint)
@@ -199,6 +206,17 @@ struct MovieRowView: View {
             case .flatrate: return "Incluso"
             case .rent: return "Noleggio"
             case .buy: return "Acquisto"
+            }
+        }
+
+        var symbolName: String? {
+            switch kind {
+            case .flatrate:
+                return nil
+            case .rent:
+                return "play.rectangle"
+            case .buy:
+                return "cart"
             }
         }
     }
