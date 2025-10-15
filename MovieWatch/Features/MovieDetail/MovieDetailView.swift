@@ -130,8 +130,7 @@ private extension MovieDetailView {
     
     @ViewBuilder
     var availabilitySection: some View {
-        let groups = providerGroups
-        if groups.isEmpty {
+        if providerGroups.isEmpty {
             detailSection(alignment: .leading, spacing: 12) {
                 Text("Disponibile su")
                     .font(.headline)
@@ -141,20 +140,12 @@ private extension MovieDetailView {
                     .foregroundStyle(secondaryTextColor)
             }
         } else {
-            ForEach(groups, id: \.title) { group in
+            ForEach(providerGroups) { group in
                 detailSection(alignment: .leading, spacing: 16) {
                     Text(group.title)
                         .font(.headline)
                         .foregroundStyle(primaryTextColor)
-                    LazyVStack(spacing: 12) {
-                        ForEach(Array(group.providers.enumerated()), id: \.element.id) { index, provider in
-                            providerRow(for: provider)
-                            if index < group.providers.count - 1 {
-                                Divider()
-                                    .overlay(sectionStrokeColor.opacity(0.6))
-                            }
-                        }
-                    }
+                    providerList(for: group.providers)
                 }
             }
         }
@@ -165,8 +156,8 @@ private extension MovieDetailView {
 private extension MovieDetailView {
     @ViewBuilder
     var ratingSummary: some View {
-        if let ratingText = ratingDisplayText {
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
+            if let ratingText = ratingDisplayText {
                 HStack(spacing: 8) {
                     Image(systemName: "star.fill")
                         .foregroundStyle(.yellow)
@@ -175,11 +166,7 @@ private extension MovieDetailView {
                         .font(.title3.bold())
                         .foregroundStyle(primaryTextColor)
                 }
-                Text(reviewCountText)
-                    .font(.subheadline)
-                    .foregroundStyle(secondaryTextColor)
             }
-        } else {
             Text(reviewCountText)
                 .font(.subheadline)
                 .foregroundStyle(secondaryTextColor)
@@ -249,15 +236,10 @@ private extension MovieDetailView {
             do {
                 let api = try MovieAPI()
                 await api.enrich(movie: movie, in: context)
-                await MainActor.run {
-                    Haptics.light()
-                }
             } catch {
                 print("Refresh error:", error.localizedDescription)
-                await MainActor.run {
-                    Haptics.light()
-                }
             }
+            await fireLightHaptic()
         }
     }
     
@@ -274,12 +256,13 @@ private extension MovieDetailView {
         return count == 1 ? "\(formatted) recensione" : "\(formatted) recensioni"
     }
     
-    var providerGroups: [(title: String, providers: [Provider])] {
-        let grouped = Dictionary(grouping: movie.providers) { $0.kind }
-        let order: [Provider.Kind] = [.flatrate, .rent, .buy]
-        return order.compactMap { kind in
-            guard let providers = grouped[kind], !providers.isEmpty else { return nil }
-            return (availabilityTitle(for: kind), providers.sorted { $0.name < $1.name })
+    var providerGroups: [ProviderGroup] {
+        Provider.Kind.allCases.compactMap { kind in
+            let providers = movie.providers
+                .filter { $0.kind == kind }
+                .sorted { $0.name < $1.name }
+            guard !providers.isEmpty else { return nil }
+            return ProviderGroup(kind: kind, providers: providers)
         }
     }
     
@@ -300,15 +283,24 @@ private extension MovieDetailView {
     
     func providerLogoView(for url: URL?) -> some View {
         AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
+            if let image = phase.image {
                 image
                     .resizable()
                     .scaledToFill()
-            case .failure, .empty:
+            } else {
                 placeholderLogo
-            @unknown default:
-                placeholderLogo
+            }
+        }
+    }
+    
+    func providerList(for providers: [Provider]) -> some View {
+        LazyVStack(spacing: 12) {
+            ForEach(Array(providers.enumerated()), id: \.element.id) { index, provider in
+                providerRow(for: provider)
+                if index < providers.count - 1 {
+                    Divider()
+                        .overlay(sectionStrokeColor.opacity(0.6))
+                }
             }
         }
     }
@@ -323,18 +315,15 @@ private extension MovieDetailView {
         }
     }
     
-    func availabilityTitle(for kind: Provider.Kind) -> String {
-        switch kind {
-        case .flatrate: return "Incluso nell'abbonamento"
-        case .rent: return "Disponibile a noleggio"
-        case .buy: return "Disponibile all'acquisto"
-        }
-    }
-    
     var primaryTextColor: Color { .white }
     var secondaryTextColor: Color { .white.opacity(0.7) }
     var sectionBackgroundColor: Color { .white.opacity(0.06) }
     var sectionStrokeColor: Color { .white.opacity(0.12) }
+    
+    @MainActor
+    func fireLightHaptic() {
+        Haptics.light()
+    }
 }
 
 // MARK: - Async image helpers
@@ -409,5 +398,23 @@ private struct BackdropView: View {
             startPoint: .top,
             endPoint: .bottom
         )
+    }
+}
+
+private struct ProviderGroup: Identifiable {
+    let kind: Provider.Kind
+    let providers: [Provider]
+    
+    var id: Provider.Kind { kind }
+    var title: String { kind.availabilityTitle }
+}
+
+private extension Provider.Kind {
+    var availabilityTitle: String {
+        switch self {
+        case .flatrate: return "Incluso nell'abbonamento"
+        case .rent: return "Disponibile a noleggio"
+        case .buy: return "Disponibile all'acquisto"
+        }
     }
 }
