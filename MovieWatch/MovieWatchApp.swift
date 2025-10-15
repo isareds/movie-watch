@@ -13,6 +13,7 @@ struct MovieWatchApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
+            Movie.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -25,7 +26,7 @@ struct MovieWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            HomeView().tint(.black)
         }
         .modelContainer(sharedModelContainer)
     }
