@@ -70,7 +70,7 @@ struct MovieDetailView: View {
 private extension MovieDetailView {
     var headerSection: some View {
         detailSection {
-            HStack(alignment: .top, spacing: 20) {
+            HStack(alignment: .top, spacing: 15) {
                 PosterView(url: movie.posterURL)
                     .frame(width: 140, height: 210)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -90,7 +90,7 @@ private extension MovieDetailView {
                             Image(systemName: "calendar")
                                 .font(.subheadline)
                                 .foregroundStyle(secondaryTextColor)
-                            Text("\(year)")
+                            Text(verbatim: String(year))
                                 .font(.subheadline)
                                 .foregroundStyle(secondaryTextColor)
                         }
