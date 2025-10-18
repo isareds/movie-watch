@@ -28,6 +28,7 @@
 - Persisted movie runtime metadata from TMDB and added a detail slider to track watch progress (Codex).
 - Switched provider listing to a horizontal logo carousel with deep-links to TMDB watch pages (Codex).
 - Added a director and cast card to the movie detail view using TMDB credits (Codex).
+- Limited TMDB credits enrichment and moved heavy processing off the main actor to avoid UI freezes (Codex).
 
 # Coding guidelines
 - Default to spaces for indentation (existing Swift files use four-space indents).

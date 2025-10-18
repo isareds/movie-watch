@@ -18,6 +18,19 @@ final class MovieAPI {
     private let language: String
     private let watchRegion: String
 
+    private struct CreditsPayload {
+        var cast: [CreditPayload]
+        var crew: [CreditPayload]
+    }
+
+    private struct CreditPayload {
+        let department: String
+        let name: String
+        let character: String?
+        let profileURL: URL?
+        let job: String?
+    }
+
     init() throws {
         let configuration = try MovieAPI.loadConfiguration()
         self.token = configuration.token
@@ -129,34 +142,15 @@ final class MovieAPI {
             guard let chttp = cresp as? HTTPURLResponse, (200..<300).contains(chttp.statusCode) else {
                 throw MovieAPIError.badStatus((cresp as? HTTPURLResponse)?.statusCode ?? -1)
             }
-            let credits = try JSONDecoder().decode(TMDBCreditsResponse.self, from: cdata)
+            let creditsResponse = try JSONDecoder().decode(TMDBCreditsResponse.self, from: cdata)
+            let creditsPayload = prepareCreditsPayload(from: creditsResponse)
             let creditsModel = await MainActor.run {
-                let cast = (credits.cast ?? []).map {
-                    Credit(
-                        known_for_department: $0.known_for_department,
-                        name: $0.name,
-                        character: $0.character,
-                        profile_path: buildImageURL($0.profile_path, size: "w185"),
-                        job: $0.job,
-                        order: $0.order ?? -1
-                    )
-                }
-                let crew = (credits.crew ?? []).map {
-                    Credit(
-                        known_for_department: $0.known_for_department,
-                        name: $0.name,
-                        character: $0.character,
-                        profile_path: buildImageURL($0.profile_path, size: "w185"),
-                        job: $0.job,
-                        order: $0.order ?? -1
-                    )
-                }
-                return Credits(cast: cast, crew: crew)
+                makeCreditsModel(from: creditsPayload)
             }
             await MainActor.run {
                 if let existingCredits = movie.credits {
-                    existingCredits.cast?.forEach { context.delete($0) }
-                    existingCredits.crew?.forEach { context.delete($0) }
+                    existingCredits.cast.forEach { context.delete($0) }
+                    existingCredits.crew.forEach { context.delete($0) }
                     context.delete(existingCredits)
                 }
                 movie.credits = creditsModel
@@ -252,5 +246,80 @@ final class MovieAPI {
             }
             return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
         }
+    }
+
+    private func prepareCreditsPayload(from response: TMDBCreditsResponse) -> CreditsPayload {
+        let cast = prepareCastPayload(from: response.cast ?? [])
+        let crew = prepareCrewPayload(from: response.crew ?? [])
+        return CreditsPayload(cast: cast, crew: crew)
+    }
+
+    private func prepareCastPayload(from cast: [TMDBCredit]) -> [CreditPayload] {
+        let sorted = cast.sorted { ($0.order ?? Int.max) < ($1.order ?? Int.max) }
+        var deduped = Set<String>()
+        var payload: [CreditPayload] = []
+        for member in sorted {
+            guard member.known_for_department.localizedCaseInsensitiveCompare("Acting") == .orderedSame else { continue }
+            guard deduped.insert(member.name).inserted else { continue }
+            payload.append(
+                CreditPayload(
+                    department: member.department ?? member.known_for_department,
+                    name: member.name,
+                    character: member.character,
+                    profileURL: buildImageURL(member.profile_path, size: "w185"),
+                    job: member.job
+                )
+            )
+            if payload.count >= 12 { break }
+        }
+        return payload
+    }
+
+    private func prepareCrewPayload(from crew: [TMDBCredit]) -> [CreditPayload] {
+        let filtered = crew.filter { credit in
+            if let job = credit.job?.lowercased(), job.contains("director") { return true }
+            if let department = credit.department?.lowercased(), department == "directing" { return true }
+            return credit.known_for_department.localizedCaseInsensitiveCompare("Directing") == .orderedSame
+        }
+        var deduped = Set<String>()
+        var payload: [CreditPayload] = []
+        for member in filtered {
+            guard deduped.insert(member.name).inserted else { continue }
+            payload.append(
+                CreditPayload(
+                    department: member.department ?? member.known_for_department,
+                    name: member.name,
+                    character: member.character,
+                    profileURL: buildImageURL(member.profile_path, size: "w185"),
+                    job: member.job
+                )
+            )
+            if payload.count >= 3 { break }
+        }
+        return payload
+    }
+
+    @MainActor
+    private func makeCreditsModel(from payload: CreditsPayload) -> Credits? {
+        let cast = payload.cast.map {
+            Credit(
+                known_for_department: $0.department,
+                name: $0.name,
+                character: $0.character,
+                profile_path: $0.profileURL,
+                job: $0.job
+            )
+        }
+        let crew = payload.crew.map {
+            Credit(
+                known_for_department: $0.department,
+                name: $0.name,
+                character: $0.character,
+                profile_path: $0.profileURL,
+                job: $0.job
+            )
+        }
+        guard !(cast.isEmpty && crew.isEmpty) else { return nil }
+        return Credits(cast: cast, crew: crew)
     }
 }

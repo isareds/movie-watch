@@ -5,7 +5,6 @@ import SwiftData
 struct MovieDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-    @Environment(\.openURL) private var openURL
     
     @Bindable var movie: Movie
 
@@ -224,52 +223,14 @@ private extension MovieDetailView {
 // MARK: - Subviews & Helpers
 private extension MovieDetailView {
     var mainCastCredits: [Credit] {
-        var seen = Set<String>()
-        var result: [Credit] = []
-        let maxCastCount = 12
-        
-        let cast = movie.credits?.cast ?? []
-        let sortedCast = cast.sorted { $0.order  < $1.order }
-        
-        for credit in sortedCast {
-            guard credit.known_for_department.localizedCaseInsensitiveCompare("Acting") == .orderedSame else { continue }
-            
-            if seen.insert(credit.name).inserted {
-                result.append(credit)
-            }
-            
-            if result.count >= maxCastCount {
-                break
-            }
-        }
-        
-        return result
+        movie.credits?.cast ?? []
     }
     
     var directorDisplayName: String? {
-        var seen = Set<String>()
-        var names: [String] = []
-        let maxCastCount = 12
-        
         let crew = movie.credits?.crew ?? []
-        
-        for credit in crew {
-            let jobMatch = credit.job?.localizedCaseInsensitiveContains("director") ?? false
-            let departmentMatch = credit.known_for_department.localizedCaseInsensitiveCompare("Directing") == .orderedSame
-            
-            guard jobMatch || departmentMatch else { continue }
-            
-            if seen.insert(credit.name).inserted {
-                names.append(credit.name)
-            }
-            
-            if names.count >= maxCastCount {
-                break
-            }
-        }
-        
-        guard !names.isEmpty else { return nil }
-        return names.joined(separator: ", ")
+        guard !crew.isEmpty else { return nil }
+        let names = crew.map(\.name)
+        return names.isEmpty ? nil : names.joined(separator: ", ")
     }
     
     func castChip(for credit: Credit) -> some View {

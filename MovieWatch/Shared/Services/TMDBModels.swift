@@ -50,5 +50,6 @@ struct TMDBCredit: Decodable, Identifiable {
     let profile_path: String?
     let known_for_department: String
     let job: String?
+    let department: String?
     let order: Int?
 }

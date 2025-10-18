@@ -9,7 +9,6 @@ final class Credit {
     var character: String?
     var profile_path: URL?
     var job: String?
-    var order: Int
 
     init(
         id: UUID = .init(),
@@ -17,8 +16,7 @@ final class Credit {
         name: String,
         character: String? = nil,
         profile_path: URL? = nil,
-        job: String? = nil,
-        order: Int
+        job: String? = nil
     ) {
         self.id = id
         self.known_for_department = known_for_department
@@ -26,7 +24,6 @@ final class Credit {
         self.character = character
         self.profile_path = profile_path
         self.job = job
-        self.order = order
     }
 }
 
@@ -34,10 +31,10 @@ final class Credit {
 @Model
 final class Credits {
     var id: UUID
-    var cast: [Credit]? = []
-    var crew: [Credit]? = []
-    
-    init(id: UUID = .init(), cast: [Credit], crew: [Credit]) {
+    var cast: [Credit]
+    var crew: [Credit]
+
+    init(id: UUID = .init(), cast: [Credit] = [], crew: [Credit] = []) {
         self.id = id
         self.cast = cast
         self.crew = crew
