@@ -33,3 +33,6 @@
 - Favor SOLID, KISS, DRY, and YAGNI; avoid speculative abstractions.
 - Gate new async behavior behind `@MainActor` when mutating SwiftData models or UI state.
 - Ensure new dependencies (SFSymbols, colors, etc.) exist on the minimum deployment target before relying on them.
+
+# Git guidelines
+- Commit message must be atomic and in english.

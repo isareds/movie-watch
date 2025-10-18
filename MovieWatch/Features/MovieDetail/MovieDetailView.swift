@@ -121,37 +121,39 @@ private extension MovieDetailView {
     
     @ViewBuilder
     var progressSection: some View {
-        detailSection(alignment: .leading, spacing: 16) {
-            Text("Progresso")
-                .font(.headline)
-                .foregroundStyle(primaryTextColor)
-            
-            let runtime: Int = movie.runtime
-            if runtime > 0 {
-                VStack(alignment: .leading, spacing: 12) {
-                    Slider(
-                        value: progressBinding(for: runtime),
-                        in: 0...Double(runtime),
-                        step: 1
-                    ) {
-                        Text("Punto raggiunto")
+        if (movie.runtime <= 0) {
+            EmptyView()
+        } else {
+            detailSection(alignment: .leading, spacing: 16) {
+                Text("Dove sei arrivato?")
+                    .font(.headline)
+                    .foregroundStyle(primaryTextColor)
+                
+                let runtime: Int = movie.runtime
+                if runtime > 0 {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Slider(
+                            value: progressBinding(for: runtime),
+                            in: 0...Double(runtime),
+                            step: 1
+                        )
+                        .tint(.green.opacity(0.8))
+                        
+                        HStack {
+                            Text("\(formattedMinutes(movie.watchPosition))")
+                                .font(.subheadline)
+                                .foregroundStyle(primaryTextColor)
+                            Spacer()
+                            Text("Durata: \(formattedMinutes(runtime))")
+                                .font(.subheadline)
+                                .foregroundStyle(secondaryTextColor)
+                        }
                     }
-                    .tint(.green.opacity(0.8))
-                    
-                    HStack {
-                        Text("Avanzamento: \(formattedMinutes(movie.watchPosition))")
-                            .font(.subheadline)
-                            .foregroundStyle(primaryTextColor)
-                        Spacer()
-                        Text("Durata: \(formattedMinutes(runtime))")
-                            .font(.subheadline)
-                            .foregroundStyle(secondaryTextColor)
-                    }
+                } else {
+                    Text("Durata non disponibile. Aggiorna i dati per recuperarla da TMDB.")
+                        .font(.subheadline)
+                        .foregroundStyle(secondaryTextColor)
                 }
-            } else {
-                Text("Durata non disponibile. Aggiorna i dati per recuperarla da TMDB.")
-                    .font(.subheadline)
-                    .foregroundStyle(secondaryTextColor)
             }
         }
     }
