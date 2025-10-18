@@ -16,10 +16,12 @@ final class Movie {
     var year: Int?
     var plot: String?
     var posterURL: URL?
+    var runtime: Int
 
     var providers: [Provider] = []
 
     var seen: Bool
+    var watchPosition: Int
     var createdAt: Date
     var vote_average: Double?
     var vote_count: Int?
@@ -32,8 +34,10 @@ final class Movie {
         year: Int? = nil,
         plot: String? = nil,
         posterURL: URL? = nil,
+        runtime: Int = 0,
         providers: [Provider] = [],
         seen: Bool = false,
+        watchPosition: Int = 0,
         createdAt: Date = .now,
         isFetching: Bool = false,
         vote_average: Double? = nil,
@@ -44,8 +48,10 @@ final class Movie {
         self.year = year
         self.plot = plot
         self.posterURL = posterURL
+        self.runtime = runtime
         self.providers = providers
         self.seen = seen
+        self.watchPosition = watchPosition
         self.createdAt = createdAt
         self.isFetching = isFetching
         self.vote_average = vote_average

@@ -137,6 +137,13 @@ final class MovieAPI {
                 if movie.posterURL == nil {
                     movie.posterURL = buildImageURL(details.poster_path)
                 }
+
+                if let runtime = details.runtime {
+                    movie.runtime = runtime
+                    if movie.watchPosition > runtime {
+                        movie.watchPosition = runtime
+                    }
+                }
                 
                 movie.vote_average = details.vote_average
                 movie.vote_count = details.vote_count
@@ -206,3 +213,4 @@ final class MovieAPI {
         }
     }
 }
+

@@ -19,6 +19,7 @@ struct MovieDetailView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 28) {
                         headerSection
+                        progressSection
                         plotSection
                         availabilitySection
                     }
@@ -113,6 +114,43 @@ private extension MovieDetailView {
             } else {
                 Text("Nessuna trama disponibile. La aggiungeremo con lo scraper/API.")
                     .font(.callout)
+                    .foregroundStyle(secondaryTextColor)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    var progressSection: some View {
+        detailSection(alignment: .leading, spacing: 16) {
+            Text("Progresso")
+                .font(.headline)
+                .foregroundStyle(primaryTextColor)
+            
+            let runtime: Int = movie.runtime
+            if runtime > 0 {
+                VStack(alignment: .leading, spacing: 12) {
+                    Slider(
+                        value: progressBinding(for: runtime),
+                        in: 0...Double(runtime),
+                        step: 1
+                    ) {
+                        Text("Punto raggiunto")
+                    }
+                    .tint(.green.opacity(0.8))
+                    
+                    HStack {
+                        Text("Avanzamento: \(formattedMinutes(movie.watchPosition))")
+                            .font(.subheadline)
+                            .foregroundStyle(primaryTextColor)
+                        Spacer()
+                        Text("Durata: \(formattedMinutes(runtime))")
+                            .font(.subheadline)
+                            .foregroundStyle(secondaryTextColor)
+                    }
+                }
+            } else {
+                Text("Durata non disponibile. Aggiorna i dati per recuperarla da TMDB.")
+                    .font(.subheadline)
                     .foregroundStyle(secondaryTextColor)
             }
         }
@@ -309,6 +347,30 @@ private extension MovieDetailView {
     var secondaryTextColor: Color { .white.opacity(0.7) }
     var sectionBackgroundColor: Color { .white.opacity(0.06) }
     var sectionStrokeColor: Color { .white.opacity(0.12) }
+    
+    func progressBinding(for runtime: Int) -> Binding<Double> {
+        Binding(
+            get: { Double(min(movie.watchPosition, runtime)) },
+            set: { value in
+                let minutes = Int(value.rounded())
+                movie.watchPosition = max(0, min(minutes, runtime))
+            }
+        )
+    }
+    
+    func formattedMinutes(_ minutes: Int) -> String {
+        guard minutes > 0 else { return "0m" }
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        if hours > 0 {
+            if remainder > 0 {
+                return "\(hours)h \(remainder)m"
+            } else {
+                return "\(hours)h"
+            }
+        }
+        return "\(minutes)m"
+    }
     
     @MainActor
     func fireLightHaptic() {

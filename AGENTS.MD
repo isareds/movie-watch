@@ -25,6 +25,7 @@
 - Prefer small, composable SwiftUI views. Keep state at the feature/store level and pass bindings down.
 - Every time you choose to do something important, related to coding or a new framework logic, that need a mention on AGENTS.md update this file.
 - Simplified `MovieDetailView` section rendering and availability grouping to reduce duplicated layout logic (Codex).
+- Persisted movie runtime metadata from TMDB and added a detail slider to track watch progress (Codex).
 
 # Coding guidelines
 - Default to spaces for indentation (existing Swift files use four-space indents).
