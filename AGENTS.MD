@@ -26,6 +26,8 @@
 - Every time you choose to do something important, related to coding or a new framework logic, that need a mention on AGENTS.md update this file.
 - Simplified `MovieDetailView` section rendering and availability grouping to reduce duplicated layout logic (Codex).
 - Persisted movie runtime metadata from TMDB and added a detail slider to track watch progress (Codex).
+- Switched provider listing to a horizontal logo carousel with deep-links to TMDB watch pages (Codex).
+- Added a director and cast card to the movie detail view using TMDB credits (Codex).
 
 # Coding guidelines
 - Default to spaces for indentation (existing Swift files use four-space indents).

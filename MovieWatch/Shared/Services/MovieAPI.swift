@@ -121,7 +121,48 @@ final class MovieAPI {
             let providers = try JSONDecoder().decode(TMDBWatchProvidersResponse.self, from: wdata)
             let it = providers.results[watchRegion]
 
-            // 4) Aggiorna il tuo modello
+            // 4) CREDITS PROVIDERS (IT)
+            let creditsURL = URL(string:
+              "https://api.themoviedb.org/3/movie/\(first.id)/credits?language=\(language)"
+            )!
+            let (cdata, cresp) = try await URLSession.shared.data(for: try request(creditsURL))
+            guard let chttp = cresp as? HTTPURLResponse, (200..<300).contains(chttp.statusCode) else {
+                throw MovieAPIError.badStatus((cresp as? HTTPURLResponse)?.statusCode ?? -1)
+            }
+            let credits = try JSONDecoder().decode(TMDBCreditsResponse.self, from: cdata)
+            let creditsModel = await MainActor.run {
+                let cast = (credits.cast ?? []).map {
+                    Credit(
+                        known_for_department: $0.known_for_department,
+                        name: $0.name,
+                        character: $0.character,
+                        profile_path: buildImageURL($0.profile_path, size: "w185"),
+                        job: $0.job,
+                        order: $0.order ?? -1
+                    )
+                }
+                let crew = (credits.crew ?? []).map {
+                    Credit(
+                        known_for_department: $0.known_for_department,
+                        name: $0.name,
+                        character: $0.character,
+                        profile_path: buildImageURL($0.profile_path, size: "w185"),
+                        job: $0.job,
+                        order: $0.order ?? -1
+                    )
+                }
+                return Credits(cast: cast, crew: crew)
+            }
+            await MainActor.run {
+                if let existingCredits = movie.credits {
+                    existingCredits.cast?.forEach { context.delete($0) }
+                    existingCredits.crew?.forEach { context.delete($0) }
+                    context.delete(existingCredits)
+                }
+                movie.credits = creditsModel
+            }
+
+            // 5) Aggiorna il tuo modello
             let providerModels = await MainActor.run { makeProviders(from: it) }
             await MainActor.run {
                 
@@ -213,4 +254,3 @@ final class MovieAPI {
         }
     }
 }
-

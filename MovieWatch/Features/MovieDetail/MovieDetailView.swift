@@ -5,6 +5,7 @@ import SwiftData
 struct MovieDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.openURL) private var openURL
     
     @Bindable var movie: Movie
 
@@ -19,6 +20,7 @@ struct MovieDetailView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 28) {
                         headerSection
+                        creditsSection
                         progressSection
                         plotSection
                         availabilitySection
@@ -102,6 +104,49 @@ private extension MovieDetailView {
         }
     }
     
+    var creditsSection: some View {
+        let directorName = directorDisplayName
+        let cast = mainCastCredits
+        
+        return detailSection(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Regista")
+                    .font(.headline)
+                    .foregroundStyle(primaryTextColor)
+                if let directorName {
+                    Text(directorName)
+                        .font(.subheadline)
+                        .foregroundStyle(primaryTextColor)
+                } else {
+                    Text("Non disponibile al momento.")
+                        .font(.subheadline)
+                        .foregroundStyle(secondaryTextColor)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Cast")
+                    .font(.headline)
+                    .foregroundStyle(primaryTextColor)
+                
+                if cast.isEmpty {
+                    Text("Cast non disponibile al momento.")
+                        .font(.subheadline)
+                        .foregroundStyle(secondaryTextColor)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(cast, id: \.id) { credit in
+                                castChip(for: credit)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+        }
+    }
+    
     var plotSection: some View {
         detailSection(alignment: .leading, spacing: 12) {
             Text("Trama")
@@ -121,7 +166,8 @@ private extension MovieDetailView {
     
     @ViewBuilder
     var progressSection: some View {
-        if (movie.runtime <= 0) {
+        let runtime = movie.runtime
+        if(runtime <= 0) {
             EmptyView()
         } else {
             detailSection(alignment: .leading, spacing: 16) {
@@ -129,30 +175,23 @@ private extension MovieDetailView {
                     .font(.headline)
                     .foregroundStyle(primaryTextColor)
                 
-                let runtime: Int = movie.runtime
-                if runtime > 0 {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Slider(
-                            value: progressBinding(for: runtime),
-                            in: 0...Double(runtime),
-                            step: 1
-                        )
-                        .tint(.green.opacity(0.8))
-                        
-                        HStack {
-                            Text("\(formattedMinutes(movie.watchPosition))")
-                                .font(.subheadline)
-                                .foregroundStyle(primaryTextColor)
-                            Spacer()
-                            Text("Durata: \(formattedMinutes(runtime))")
-                                .font(.subheadline)
-                                .foregroundStyle(secondaryTextColor)
-                        }
+                VStack(alignment: .leading, spacing: 12) {
+                    Slider(
+                        value: progressBinding(for: runtime),
+                        in: 0...Double(runtime),
+                        step: 1
+                    )
+                    .tint(.green.opacity(0.8))
+                    
+                    HStack {
+                        Text("\(formattedMinutes(movie.watchPosition))")
+                            .font(.subheadline)
+                            .foregroundStyle(primaryTextColor)
+                        Spacer()
+                        Text("Durata: \(formattedMinutes(runtime))")
+                            .font(.subheadline)
+                            .foregroundStyle(secondaryTextColor)
                     }
-                } else {
-                    Text("Durata non disponibile. Aggiorna i dati per recuperarla da TMDB.")
-                        .font(.subheadline)
-                        .foregroundStyle(secondaryTextColor)
                 }
             }
         }
@@ -184,6 +223,67 @@ private extension MovieDetailView {
 
 // MARK: - Subviews & Helpers
 private extension MovieDetailView {
+    var mainCastCredits: [Credit] {
+        var seen = Set<String>()
+        var result: [Credit] = []
+        let maxCastCount = 12
+        
+        let cast = movie.credits?.cast ?? []
+        let sortedCast = cast.sorted { $0.order  < $1.order }
+        
+        for credit in sortedCast {
+            guard credit.known_for_department.localizedCaseInsensitiveCompare("Acting") == .orderedSame else { continue }
+            
+            if seen.insert(credit.name).inserted {
+                result.append(credit)
+            }
+            
+            if result.count >= maxCastCount {
+                break
+            }
+        }
+        
+        return result
+    }
+    
+    var directorDisplayName: String? {
+        var seen = Set<String>()
+        var names: [String] = []
+        let maxCastCount = 12
+        
+        let crew = movie.credits?.crew ?? []
+        
+        for credit in crew {
+            let jobMatch = credit.job?.localizedCaseInsensitiveContains("director") ?? false
+            let departmentMatch = credit.known_for_department.localizedCaseInsensitiveCompare("Directing") == .orderedSame
+            
+            guard jobMatch || departmentMatch else { continue }
+            
+            if seen.insert(credit.name).inserted {
+                names.append(credit.name)
+            }
+            
+            if names.count >= maxCastCount {
+                break
+            }
+        }
+        
+        guard !names.isEmpty else { return nil }
+        return names.joined(separator: ", ")
+    }
+    
+    func castChip(for credit: Credit) -> some View {
+        Text(credit.name)
+            .font(.subheadline)
+            .foregroundStyle(primaryTextColor)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background {
+                Capsule()
+                    .fill(Color.white.opacity(0.08))
+            }
+    }
+    
     @ViewBuilder
     var ratingSummary: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -296,21 +396,6 @@ private extension MovieDetailView {
         }
     }
     
-    func providerRow(for provider: Provider) -> some View {
-        HStack(spacing: 14) {
-            providerLogoView(for: provider.logo)
-                .frame(width: 44, height: 44)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            
-            Text(provider.name)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(primaryTextColor)
-            
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    
     func providerLogoView(for url: URL?) -> some View {
         AsyncImage(url: url) { phase in
             if let image = phase.image {
@@ -324,14 +409,26 @@ private extension MovieDetailView {
     }
     
     func providerList(for providers: [Provider]) -> some View {
-        LazyVStack(spacing: 12) {
-            ForEach(Array(providers.enumerated()), id: \.element.id) { index, provider in
-                providerRow(for: provider)
-                if index < providers.count - 1 {
-                    Divider()
-                        .overlay(sectionStrokeColor.opacity(0.6))
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                ForEach(providers) { provider in
+                    providerLogoTile(for: provider)
                 }
             }
+            .padding(.vertical, 4)
+        }
+    }
+    
+    @ViewBuilder
+    func providerLogoTile(for provider: Provider) -> some View {
+        let logo = providerLogoView(for: provider.logo)
+            .frame(width: 56, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        
+        ZStack {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+            logo
         }
     }
     

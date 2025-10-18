@@ -19,6 +19,7 @@ final class Movie {
     var runtime: Int
 
     var providers: [Provider] = []
+    var credits: Credits?
 
     var seen: Bool
     var watchPosition: Int

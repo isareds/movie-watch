@@ -37,3 +37,18 @@ struct TMDBProvider: Decodable {
     let provider_name: String
     let logo_path: String?
 }
+
+struct TMDBCreditsResponse: Decodable {
+    let cast: [TMDBCredit]?
+    let crew: [TMDBCredit]?
+}
+
+struct TMDBCredit: Decodable, Identifiable {
+    let id: Int
+    let name: String
+    let character: String?
+    let profile_path: String?
+    let known_for_department: String
+    let job: String?
+    let order: Int?
+}
