@@ -63,10 +63,9 @@ struct MovieRowView: View {
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 4)
-        .contentShape(Rectangle())
         .overlay(alignment: .bottom) {
             if showSeparator {
-                separator
+                // separator
             }
         }
     }
@@ -118,6 +117,9 @@ struct MovieRowView: View {
         HStack(spacing: 6) {
             if category.kind == .flatrate {
                 providerLogoStack(for: category.providers)
+                Text(category.displayLabel)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(category.tint)
             } else if let symbol = category.symbolName {
                 Image(systemName: symbol)
                     .font(.caption.weight(.semibold))
@@ -127,10 +129,7 @@ struct MovieRowView: View {
                         Circle()
                             .fill(category.tint.opacity(0.2))
                     )
-            }
-            Text(category.displayLabel)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(category.tint)
+            }            
         }
         .padding(.vertical, 5)
         .padding(.horizontal, 10)
